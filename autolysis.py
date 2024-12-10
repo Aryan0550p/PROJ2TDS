@@ -6,6 +6,11 @@
 #     "pandas",
 #     "python-dotenv",
 #     "requests",
+#     "openai",
+#     "scikit-learn",
+#     "tabulate",
+#     "fastapi",
+#     "uvicorn",
 #     "seaborn",
 # ]
 # ///
