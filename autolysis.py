@@ -1,3 +1,14 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "chardet",
+#     "matplotlib",
+#     "pandas",
+#     "python-dotenv",
+#     "requests",
+#     "seaborn",
+# ]
+# ///
 import os
 import sys
 import pandas as pd
