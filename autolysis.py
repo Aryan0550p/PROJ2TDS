@@ -20,12 +20,16 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import openai
+from dotenv import load_dotenv
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from tabulate import tabulate
 
+load_dotenv()
 # Set the AI Proxy token
-os.environ["AIPROXY_TOKEN"] = "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjI0ZjEwMDAyMzdAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.efA4RgOA0zV-WTF8lxfwGqMYrIPD02PjkCEWIyE7CNQ"  # Replace with actual token
+if "AIPROXY_TOKEN" not in os.environ:
+    raise EnvironmentError("The environment variable 'AIPROXY_TOKEN' must be set.")
+    
 openai.api_base = "https://aiproxy.sanand.workers.dev/openai/v1"
 openai.api_key = os.environ["AIPROXY_TOKEN"]
 
