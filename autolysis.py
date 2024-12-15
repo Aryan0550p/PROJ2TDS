@@ -235,7 +235,7 @@ def generate_llm_narrative(overview, summary_stats, heatmap_file, cluster_file, 
         return "An error occurred while generating the narrative."
 
 # Entry point for the script
-if _name_ == "_main_":
+if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python autolysis.py <csv_filename>")
     else:
