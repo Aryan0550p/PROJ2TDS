@@ -6,7 +6,7 @@
 #     "pandas",
 #     "python-dotenv",
 #     "requests",
-#     "openai",
+#     "openai==0.28.0",
 #     "scikit-learn",
 #     "tabulate",
 #     "fastapi",
