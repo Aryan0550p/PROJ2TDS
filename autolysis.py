@@ -217,12 +217,12 @@ def generate_llm_narrative(overview, summary_stats, heatmap_file, cluster_file, 
 
         # Call the LLM
         response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
+            model="gpt-4o-mini",  # using a lighter model to avoid token overload
             messages=[
                 {"role": "system", "content": "You are a helpful data analyst."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=1000,
+            max_tokens=800,  # Limit token usage for optimization
             temperature=0.7
         )
 
@@ -241,3 +241,4 @@ if __name__ == "__main__":
     else:
         csv_filename = sys.argv[1]
         analyze_and_generate_report(csv_filename)
+
