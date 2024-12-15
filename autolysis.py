@@ -12,8 +12,10 @@
 #     "fastapi",
 #     "uvicorn",
 #     "seaborn",
+#     "pillow",  # Added for image handling
 # ]
 # ///
+
 import os
 import sys
 import pandas as pd
@@ -23,10 +25,9 @@ import openai
 from dotenv import load_dotenv
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
 from tabulate import tabulate
+from PIL import Image
+import io
 
 load_dotenv()
 
@@ -88,18 +89,17 @@ def analyze_and_generate_report(csv_filename):
     plt.close()
     print(f"Saved histograms as {histograms_file}")
 
-    # Standardization and clustering
+    # Cluster analysis visualization
     cluster_file = None
     if len(numeric_cols) > 1:
-        scaler = StandardScaler()
-        scaled_data = scaler.fit_transform(df[numeric_cols].dropna())
-
+        # Perform clustering
         kmeans = KMeans(n_clusters=3, random_state=42)
-        clusters = kmeans.fit_predict(scaled_data)
+        cluster_data = df[numeric_cols].dropna()
+        clusters = kmeans.fit_predict(cluster_data)
 
         # Dimensionality reduction for visualization
         pca = PCA(n_components=2)
-        reduced_data = pca.fit_transform(scaled_data)
+        reduced_data = pca.fit_transform(cluster_data)
         cluster_df = pd.DataFrame(reduced_data, columns=["PCA1", "PCA2"])
         cluster_df["Cluster"] = clusters
 
@@ -112,32 +112,6 @@ def analyze_and_generate_report(csv_filename):
         plt.close()
         print(f"Saved cluster analysis plot as {cluster_file}")
 
-    # Regression Analysis
-    regression_file = None
-    if len(numeric_cols) > 1:
-        # Example Linear Regression (predicting the first numeric column with the second one)
-        X = df[numeric_cols[1]].dropna().values.reshape(-1, 1)
-        y = df[numeric_cols[0]].dropna()
-
-        model = LinearRegression()
-        model.fit(X, y)
-
-        predictions = model.predict(X)
-        mse = mean_squared_error(y, predictions)
-
-        # Plotting regression line
-        plt.figure(figsize=(10, 8))
-        plt.scatter(X, y, color='blue', label='Data Points')
-        plt.plot(X, predictions, color='red', label='Regression Line')
-        plt.title(f"Linear Regression: {numeric_cols[1]} vs {numeric_cols[0]}")
-        plt.xlabel(numeric_cols[1])
-        plt.ylabel(numeric_cols[0])
-        plt.legend()
-        regression_file = "regression_analysis.png"
-        plt.savefig(regression_file)
-        plt.close()
-        print(f"Saved regression analysis plot as {regression_file}, MSE: {mse}")
-
     # Prepare data for LLM narrative
     dataset_overview = {
         "Number of rows": df.shape[0],
@@ -148,7 +122,7 @@ def analyze_and_generate_report(csv_filename):
     summary_stats_table = tabulate(summary_stats, headers='keys', tablefmt='pipe')
 
     # Generate LLM-based narrative
-    narrative = generate_llm_narrative(dataset_overview, summary_stats_table, heatmap_file, cluster_file, regression_file)
+    narrative = generate_llm_narrative(dataset_overview, summary_stats_table, heatmap_file, cluster_file)
 
     # Generate Markdown report
     markdown_content = f"""
@@ -175,20 +149,17 @@ def analyze_and_generate_report(csv_filename):
     if cluster_file:
         markdown_content += f"## Cluster Analysis\n![Cluster Analysis]({cluster_file})\n"
 
-    if regression_file:
-        markdown_content += f"## Regression Analysis\n![Regression Analysis]({regression_file})\n"
-
     markdown_content += "\n## Narrative Analysis\n"
     markdown_content += narrative
 
     # Save Markdown report
-    with open("README.md", "w", encoding="utf-8") as md_file:
+    with open("README.md", "w",encoding="utf-8") as md_file:
         md_file.write(markdown_content)
     print("Generated README.md report.")
 
-def generate_llm_narrative(overview, summary_stats, heatmap_file, cluster_file, regression_file):
+def generate_llm_narrative(overview, summary_stats, heatmap_file, cluster_file):
     try:
-        # Prepare the prompt for the LLM
+        # Prepare the prompt for the LLM dynamically based on data
         prompt = (
             "You are a data analyst. Write a clear, insightful narrative based on the following analysis:\n\n"
             f"### Dataset Overview\n{overview}\n\n"
@@ -204,24 +175,16 @@ def generate_llm_narrative(overview, summary_stats, heatmap_file, cluster_file, 
         if cluster_file:
             prompt += (
                 "### Cluster Analysis\n"
-                "Clusters were identified using KMeans and visualized through PCA. Explain the significance of the clustering results.\n"
+                "A PCA-based cluster analysis was performed, and clusters are visualized. Discuss potential patterns and significance.\n"
             )
 
-        if regression_file:
-            prompt += (
-                "### Regression Analysis\n"
-                "A linear regression was performed to predict one numeric variable based on another. Discuss the relationship and any implications of the model.\n"
-            )
-
-        prompt += "\nDiscuss key findings, potential implications, and recommendations based on this data."
+        prompt += "\nProvide your analysis of key findings, patterns, and recommendations based on this data."
 
         # Call the LLM
         response = openai.ChatCompletion.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful data analyst."},
-                {"role": "user", "content": prompt}
-            ],
+            messages=[{"role": "system", "content": "You are a helpful data analyst."},
+                      {"role": "user", "content": prompt}],
             max_tokens=1000,
             temperature=0.7
         )
@@ -241,4 +204,3 @@ if __name__ == "__main__":
     else:
         csv_filename = sys.argv[1]
         analyze_and_generate_report(csv_filename)
-
