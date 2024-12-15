@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import mutual_info_regression
-from scipy.stats import ttest_ind
+from scipy.stats import ttest_ind, ttest_1samp
 from tabulate import tabulate
 
 load_dotenv()
@@ -54,6 +54,60 @@ def hypothesis_testing(df, cols):
             results[f"{col1} vs {col2}"] = p_value
     return results
 
+def one_sample_ttest(df, cols, population_mean):
+    """Perform one-sample t-tests comparing each column's mean to a population mean."""
+    results = {}
+    for col in cols:
+        stat, p_value = ttest_1samp(df[col].dropna(), population_mean)
+        results[col] = p_value
+    return results
+
+def feature_importance(df, target_col):
+    """Calculate feature importance using mutual information regression."""
+    if target_col not in df.columns:
+        print(f"Target column '{target_col}' not found in the dataset.")
+        return {}
+
+    features = df.drop(columns=[target_col]).select_dtypes(include=['float64', 'int64'])
+    target = df[target_col]
+    if features.empty:
+        print("No numeric features found for mutual information calculation.")
+        return {}
+
+    mi_scores = mutual_info_regression(features, target, discrete_features=False)
+    importance = {col: score for col, score in zip(features.columns, mi_scores)}
+    return importance
+
+def save_plot(file_name, plot_func, *args, **kwargs):
+    """Generic function to save a plot."""
+    try:
+        plot_func(*args, **kwargs)
+        plt.savefig(file_name)
+        plt.close()
+        print(f"Saved plot as {file_name}")
+        return file_name
+    except Exception as e:
+        print(f"Error saving plot {file_name}: {e}")
+        return None
+
+def generate_section_narrative(section_title, data):
+    """Generate a narrative for a specific section using the LLM."""
+    try:
+        prompt = f"Discuss the following {section_title} in detail:\n\n{data}"
+        response = openai.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful data analyst."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=1000,
+            temperature=0.7
+        )
+        return response['choices'][0]['message']['content'].strip()
+    except Exception as e:
+        print(f"Error generating narrative for {section_title}: {e}")
+        return "Error in generating narrative."
+
 def analyze_and_generate_report(csv_filename):
     try:
         df = pd.read_csv(csv_filename, encoding='ISO-8859-1')
@@ -81,29 +135,20 @@ def analyze_and_generate_report(csv_filename):
     print("\nHypothesis Testing Results:")
     print(t_test_results)
 
+    one_sample_results = one_sample_ttest(df, numeric_cols, population_mean=0)
+    print("\nOne-Sample T-Test Results (Population Mean = 0):")
+    print(one_sample_results)
+
+    feature_imp = feature_importance(df, target_col=numeric_cols[0])
+    print("\nFeature Importance:")
+    print(feature_imp)
+
     heatmap_file = None
     if len(numeric_cols) > 1:
         corr_matrix = df[numeric_cols].corr()
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f")
-        plt.title("Correlation Matrix Heatmap")
-        heatmap_file = "correlation_heatmap.png"
-        plt.savefig(heatmap_file)
-        plt.close()
-        print(f"Saved correlation heatmap as {heatmap_file}")
+        heatmap_file = save_plot("correlation_heatmap.png", sns.heatmap, corr_matrix, annot=True, cmap='coolwarm', fmt=".2f")
 
-    histograms_file = "histograms.png"
-    plt.figure(figsize=(15, len(numeric_cols) * 4))
-    for i, col in enumerate(numeric_cols):
-        plt.subplot(len(numeric_cols), 1, i + 1)
-        sns.histplot(df[col].dropna(), kde=True, bins=20, color='blue')
-        plt.title(f"Distribution of {col}")
-        plt.xlabel(col)
-        plt.ylabel("Frequency")
-    plt.tight_layout()
-    plt.savefig(histograms_file)
-    plt.close()
-    print(f"Saved histograms as {histograms_file}")
+    histograms_file = save_plot("histograms.png", lambda: [sns.histplot(df[col].dropna(), kde=True, bins=20, color='blue') or plt.title(f"Distribution of {col}") or plt.xlabel(col) or plt.ylabel("Frequency") for col in numeric_cols])
 
     cluster_file = None
     if len(numeric_cols) > 1:
@@ -116,15 +161,7 @@ def analyze_and_generate_report(csv_filename):
         cluster_df = pd.DataFrame(reduced_data, columns=["PCA1", "PCA2"])
         cluster_df["Cluster"] = clusters
 
-        plt.figure(figsize=(10, 8))
-        sns.scatterplot(x="PCA1", y="PCA2", hue="Cluster", data=cluster_df, palette="viridis")
-        plt.title("Cluster Analysis (PCA Reduced)")
-        plt.xlabel("Principal Component 1")
-        plt.ylabel("Principal Component 2")
-        cluster_file = "cluster_analysis.png"
-        plt.savefig(cluster_file)
-        plt.close()
-        print(f"Saved cluster analysis plot as {cluster_file}")
+        cluster_file = save_plot("cluster_analysis.png", sns.scatterplot, x="PCA1", y="PCA2", hue="Cluster", data=cluster_df, palette="viridis")
 
     dataset_overview = {
         "Number of rows": df.shape[0],
@@ -134,7 +171,11 @@ def analyze_and_generate_report(csv_filename):
 
     summary_stats_table = tabulate(summary_stats, headers='keys', tablefmt='pipe')
 
-    narrative = generate_llm_narrative(dataset_overview, summary_stats_table, heatmap_file, outliers, t_test_results)
+    narrative = ""
+    narrative += generate_section_narrative("Dataset Overview", dataset_overview)
+    narrative += generate_section_narrative("Summary Statistics", summary_stats_table)
+    narrative += generate_section_narrative("Outliers", outliers)
+    narrative += generate_section_narrative("Hypothesis Testing", t_test_results)
 
     markdown_content = f"""
 # Analysis Report
@@ -166,39 +207,6 @@ def analyze_and_generate_report(csv_filename):
     with open("README.md", "w", encoding="utf-8") as md_file:
         md_file.write(markdown_content)
     print("Generated README.md report.")
-
-def generate_llm_narrative(overview, summary_stats, heatmap_file, outliers, t_tests):
-    try:
-        prompt = (
-            "You are a data analyst. Write a clear, insightful narrative based on the following analysis:\n\n"
-            f"### Dataset Overview\n{overview}\n\n"
-            f"### Summary Statistics\n{summary_stats}\n\n"
-            f"### Outliers\n{outliers}\n\n"
-            f"### Hypothesis Testing\n{t_tests}\n\n"
-        )
-
-        if heatmap_file:
-            prompt += (
-                "### Correlation Matrix\n"
-                "A correlation heatmap was generated. Discuss its importance in finding relationships between numeric variables.\n"
-            )
-
-        prompt += "\nDiscuss key findings, potential implications, and recommendations based on this data."
-
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful data analyst."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=1000,
-            temperature=0.7
-        )
-
-        return response['choices'][0]['message']['content'].strip()
-    except Exception as e:
-        print(f"Error generating narrative: {e}")
-        return "An error occurred while generating the narrative."
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
