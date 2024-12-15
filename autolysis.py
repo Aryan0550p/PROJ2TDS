@@ -148,7 +148,7 @@ def analyze_and_generate_report(csv_filename):
     markdown_content += narrative
 
     # Save Markdown report
-    with open("README.md", "w") as md_file:
+    with open("README.md", "w",encoding="utf-8") as md_file:
         md_file.write(markdown_content)
     print("Generated README.md report.")
 
