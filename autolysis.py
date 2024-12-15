@@ -12,7 +12,6 @@
 #     "fastapi",
 #     "uvicorn",
 #     "seaborn",
-#     "Pillow",
 # ]
 # ///
 import os
@@ -28,7 +27,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 from tabulate import tabulate
-from PIL import Image  # Importing Pillow for image visualization
 
 load_dotenv()
 
@@ -74,8 +72,7 @@ def analyze_and_generate_report(csv_filename):
         heatmap_file = "correlation_heatmap.png"
         plt.savefig(heatmap_file)
         plt.close()
-        Image.open(heatmap_file).show()  # Display the heatmap using Pillow
-        print(f"Saved and displayed correlation heatmap as {heatmap_file}")
+        print(f"Saved correlation heatmap as {heatmap_file}")
     else:
         print("Not enough numeric columns for correlation analysis.")
 
@@ -89,8 +86,7 @@ def analyze_and_generate_report(csv_filename):
     plt.tight_layout()
     plt.savefig(histograms_file)
     plt.close()
-    Image.open(histograms_file).show()  # Display histograms using Pillow
-    print(f"Saved and displayed histograms as {histograms_file}")
+    print(f"Saved histograms as {histograms_file}")
 
     # Standardization and clustering
     cluster_file = None
@@ -114,8 +110,7 @@ def analyze_and_generate_report(csv_filename):
         cluster_file = "cluster_analysis.png"
         plt.savefig(cluster_file)
         plt.close()
-        Image.open(cluster_file).show()  # Display cluster analysis using Pillow
-        print(f"Saved and displayed cluster analysis plot as {cluster_file}")
+        print(f"Saved cluster analysis plot as {cluster_file}")
 
     # Regression Analysis
     regression_file = None
@@ -141,8 +136,7 @@ def analyze_and_generate_report(csv_filename):
         regression_file = "regression_analysis.png"
         plt.savefig(regression_file)
         plt.close()
-        Image.open(regression_file).show()  # Display regression analysis using Pillow
-        print(f"Saved and displayed regression analysis plot as {regression_file}, MSE: {mse}")
+        print(f"Saved regression analysis plot as {regression_file}, MSE: {mse}")
 
     # Prepare data for LLM narrative
     dataset_overview = {
